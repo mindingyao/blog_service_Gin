@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"blog-service/global"
 	"blog-service/pkg/app"
 	"blog-service/pkg/errcode"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -23,7 +25,7 @@ func JWT() gin.HandlerFunc {
 		if token == "" {
 			ecode = errcode.InvalidParams
 		} else {
-			_, err := app.ParseToke(token)
+			claims, err := app.ParseToke(token)
 			if err != nil {
 				switch err.(*jwt.ValidationError).Errors {
 				case jwt.ValidationErrorExpired:
@@ -31,6 +33,12 @@ func JWT() gin.HandlerFunc {
 				default:
 					ecode = errcode.UnauthorizedTokenError
 				}
+			}
+			if claims.ExpiresAt-time.Now().Unix() < int64(claims.BufferTime) {
+				claims.ExpiresAt = time.Now().Add(global.JWTSetting.Expire).Unix()
+				tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				newToken, _ := tokenClaims.SignedString(app.GetJWTSecret())
+				c.Header("new-token", newToken)
 			}
 		}
 
